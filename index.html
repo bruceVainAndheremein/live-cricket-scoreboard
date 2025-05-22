@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Cricket Scoreboard & Controller</title>
+    <title>Pro Cricket Scoreboard & Controller (Firebase Modular)</title>
     <style>
         :root {
             --bg-dark: #0D1B2A; /* Dark blue-grey */
@@ -77,7 +77,7 @@
 
         .sb-batsmen-live { display: flex; justify-content: space-between; margin-bottom: 5px; }
         .sb-batsman { font-size: 1.1em; }
-        .sb-batsman .name { display: inline-block; min-width:120px; }
+        .sb-batsman .name { display: inline-block; min-width:120px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;}
         .sb-batsman .score { font-weight: bold; font-family: var(--font-numeric); }
         .sb-batsman .balls { font-size: 0.9em; color: var(--text-muted); }
         .sb-batsman.striker .name:after { content: '*'; color: var(--highlight-green); margin-left: 3px; font-weight: bold;}
@@ -107,7 +107,7 @@
 
         .sb-bowler-timeline { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 5px;}
         .sb-bowler-info { font-size: 1em; }
-        .sb-bowler-info .name { font-weight: bold; }
+        .sb-bowler-info .name { font-weight: bold; display: inline-block; max-width: 150px; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;}
         .sb-bowler-info .figures { font-family: var(--font-numeric); }
         .sb-timeline { font-size: 1em; font-family: 'Courier New', Courier, monospace; letter-spacing: 2px; }
         .sb-timeline .ball { padding: 2px 4px; margin: 0 1px; border-radius: 3px; background-color: rgba(0,0,0,0.2); }
@@ -126,18 +126,22 @@
         /* --- Additional Info Panels (Initially Hidden) --- */
         .sb-info-panel {
             display: none;
-            position: absolute; /* Position relative to overlay wrapper if needed, or fixed on screen */
-            background-color: rgba(27, 38, 59, 0.95); /* var(--bg-medium with alpha) */
+            /* Basic styling for info panel, can be improved */
+            position: fixed; /* Or absolute if overlay-wrapper is positioned relative */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(27, 38, 59, 0.95);
             border: 1px solid var(--accent-primary);
-            padding: 15px;
-            border-radius: 5px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.5);
-            z-index: 100; /* Ensure it's on top */
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.6);
+            z-index: 1000;
             color: var(--text-light);
+            width: 300px; /* Example width */
         }
-        .sb-info-panel.visible { display: block; /* Add simple fade/slide later */ }
-        /* Example: Panel for partnership */
-        #sbPartnershipPanel { top: 100px; left: 20px; width: 250px; } /* Example positioning */
+        .sb-info-panel.visible { display: block; }
+        .sb-info-panel h4 { margin-top: 0; color: var(--accent-secondary); }
 
 
         /* --- Controller Styles (Inspired by Cricscorer) --- */
@@ -152,7 +156,7 @@
         }
         .controller.visible { display: block; }
         .controller h2, .controller h3 { color: var(--bg-dark); margin-top: 0; }
-        .controller hr { border-color: #ccc; }
+        .controller hr { border-color: #ccc; margin: 15px 0; }
 
         .ctrl-section {
             background-color: #fff;
@@ -183,6 +187,7 @@
             cursor: pointer;
             font-weight: bold;
             transition: background-color 0.2s ease;
+            font-size: 0.95em;
         }
         .controller button.primary { background-color: var(--highlight-blue); color: white; }
         .controller button.primary:hover { background-color: #0056b3; }
@@ -192,7 +197,7 @@
         .controller button.danger:hover { background-color: #b21f2d; }
         .controller button.success { background-color: var(--highlight-green); color: white; }
         .controller button.success:hover { background-color: #1e7e34; }
-        .controller button.event-btn { background-color: var(--bg-light); color: var(--text-light); min-width: 60px; text-align:center;}
+        .controller button.event-btn { background-color: var(--bg-light); color: var(--text-light); min-width: 50px; text-align:center;}
         .controller button.event-btn:hover { background-color: var(--accent-primary); }
 
         /* Basic Responsiveness for Controller */
@@ -200,12 +205,14 @@
             .ctrl-grid { grid-template-columns: 1fr; }
             .controller button { width: 100%; margin-top: 5px; }
             .ctrl-flex-buttons button { width: auto; flex-grow: 1; } /* Allow flex buttons to share space */
+            .ctrl-flex-buttons input[type="number"] { width: 60px; margin-right: 5px;}
         }
     </style>
+
 </head>
 <body>
 
-    <!-- SCOREBOARD OVERLAY (for Prism) -->
+    <!-- SCOREBOARD OVERLAY HTML -->
     <div class="scoreboard-overlay-wrapper" id="scoreboardOverlayWrapper">
         <div class="scoreboard">
             <div class="sb-team sb-team-left">
@@ -231,11 +238,11 @@
                     <div class="sb-current-overs" id="sbOvers">0.0</div>
                     <div id="sbRRR" style="font-size:0.9em;">RRR: N/A</div>
                 </div>
-                <div class="sb-target-info" id="sbTargetInfo">Target: <span class="value" id="sbTargetVal">---</span> | Need <span class="value" id="sbRunsNeeded">--</span> from <span class="value" id="sbBallsRemaining">--</span> balls</div>
+                <div class="sb-target-info" id="sbTargetInfo" style="display:none;">Target: <span class="value" id="sbTargetVal">---</span> | Need <span class="value" id="sbRunsNeeded">--</span> from <span class="value" id="sbBallsRemaining">--</span> balls</div>
                 <div class="sb-bowler-timeline">
                     <div class="sb-bowler-info">
                         <span class="name" id="sbBowlerName">Bowler</span>
-                        <span class="figures" id="sbBowlerFigures">0-0-0-0 (0.00)</span>
+                        <span class="figures" id="sbBowlerFigures">0.0-0-0-0 (0.00)</span>
                     </div>
                     <div class="sb-timeline" id="sbTimeline"></div>
                 </div>
@@ -253,13 +260,16 @@
         <div class="sb-info-panel" id="sbPartnershipPanel">
             <h4>Partnership Details</h4>
             <p>Current: <span id="infoPartnershipRuns">0</span> runs off <span id="infoPartnershipBalls">0</span> balls.</p>
-            <p>Player 1: <span id="infoP1PartnerRuns">0</span> (<span id="infoP1PartnerBalls">0</span>)</p>
-            <p>Player 2: <span id="infoP2PartnerRuns">0</span> (<span id="infoP2PartnerBalls">0</span>)</p>
+            <hr>
+            <p><span id="infoP1PartnerName">Batsman 1</span>: <span id="infoP1PartnerRuns">0</span> (<span id="infoP1PartnerBalls">0</span>)</p>
+            <p><span id="infoP2PartnerName">Batsman 2</span>: <span id="infoP2PartnerRuns">0</span> (<span id="infoP2PartnerBalls">0</span>)</p>
+            <hr>
+            <button onclick="toggleInfoPanel('sbPartnershipPanel')" class="secondary" style="width:100%; margin-top:10px;">Close</button>
         </div>
     </div>
 
 
-    <!-- CONTROLLER INTERFACE (for scorer) -->
+    <!-- CONTROLLER INTERFACE HTML -->
     <div class="controller" id="scoreController">
         <h2>Cricket Scoreboard Controller</h2>
         <p>For Prism, add this URL with `?view=overlay` at the end. (e.g., your-url.github.io/repo/?view=overlay)</p>
@@ -310,8 +320,8 @@
                 </div>
             </div>
              <div class="ctrl-flex-buttons">
-                <button onclick="updatePlayerNamesCtrl()" class="secondary">Update Names</button>
-                <button onclick="swapStrikeUI()" class="secondary">Swap Strike</button>
+                <button onclick="updatePlayerNamesCtrl()" class="secondary">Update Names & Status</button>
+                <button onclick="swapStrikeUI()" class="secondary">Swap Strike Manually</button>
             </div>
         </div>
 
@@ -359,579 +369,310 @@
         </div>
     </div>
 
-    <script>
-    // --- SCRIPT START ---
-    // Heavily revised script will go here
-    // This will be a long script, combining previous logic with new UI bindings and features.
+    <!-- NEW SCRIPT SETUP FOR MODULAR FIREBASE SDK -->
+    <script type="module">
+        // Import functions from the Firebase SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+        import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
-    let matchState = {};
-    let deliveryHistory = []; // For undo
-
-    const SCOREBOARD_LS_KEY = 'proCricketScoreboardState_v2';
-
-    // --- DOM Element Cache (for performance) ---
-    const DOMElements = {};
-    function cacheDOMElements() {
-        // Scoreboard Overlay Elements
-        DOMElements.sbOverlayWrapper = document.getElementById('scoreboardOverlayWrapper');
-        DOMElements.sbHomeTeamLogo = document.getElementById('sbHomeTeamLogo');
-        DOMElements.sbHomeTeamName = document.getElementById('sbHomeTeamName');
-        DOMElements.sbAwayTeamLogo = document.getElementById('sbAwayTeamLogo');
-        DOMElements.sbAwayTeamName = document.getElementById('sbAwayTeamName');
-        DOMElements.sbStriker = document.getElementById('sbStriker');
-        DOMElements.sbB1Name = document.getElementById('sbB1Name');
-        DOMElements.sbB1Runs = document.getElementById('sbB1Runs');
-        DOMElements.sbB1Balls = document.getElementById('sbB1Balls');
-        DOMElements.sbNonStriker = document.getElementById('sbNonStriker');
-        DOMElements.sbB2Name = document.getElementById('sbB2Name');
-        DOMElements.sbB2Runs = document.getElementById('sbB2Runs');
-        DOMElements.sbB2Balls = document.getElementById('sbB2Balls');
-        DOMElements.sbCRR = document.getElementById('sbCRR');
-        DOMElements.sbScore = document.getElementById('sbScore');
-        DOMElements.sbOvers = document.getElementById('sbOvers');
-        DOMElements.sbRRR = document.getElementById('sbRRR');
-        DOMElements.sbTargetInfo = document.getElementById('sbTargetInfo');
-        DOMElements.sbTargetVal = document.getElementById('sbTargetVal');
-        DOMElements.sbRunsNeeded = document.getElementById('sbRunsNeeded');
-        DOMElements.sbBallsRemaining = document.getElementById('sbBallsRemaining');
-        DOMElements.sbBowlerName = document.getElementById('sbBowlerName');
-        DOMElements.sbBowlerFigures = document.getElementById('sbBowlerFigures');
-        DOMElements.sbTimeline = document.getElementById('sbTimeline');
-        DOMElements.sbStatusText = document.getElementById('sbStatusText');
-        DOMElements.sbPartnership = document.getElementById('sbPartnership');
-
-        // Info Panels (example)
-        DOMElements.sbPartnershipPanel = document.getElementById('sbPartnershipPanel');
-        DOMElements.infoPartnershipRuns = document.getElementById('infoPartnershipRuns');
-        DOMElements.infoPartnershipBalls = document.getElementById('infoPartnershipBalls');
-        DOMElements.infoP1PartnerRuns = document.getElementById('infoP1PartnerRuns');
-        DOMElements.infoP1PartnerBalls = document.getElementById('infoP1PartnerBalls');
-        DOMElements.infoP2PartnerRuns = document.getElementById('infoP2PartnerRuns');
-        DOMElements.infoP2PartnerBalls = document.getElementById('infoP2PartnerBalls');
-
-        // Controller Elements
-        DOMElements.scoreController = document.getElementById('scoreController');
-        DOMElements.cHomeTeamName = document.getElementById('cHomeTeamName');
-        DOMElements.cHomeTeamShort = document.getElementById('cHomeTeamShort');
-        DOMElements.cAwayTeamName = document.getElementById('cAwayTeamName');
-        DOMElements.cAwayTeamShort = document.getElementById('cAwayTeamShort');
-        DOMElements.cTotalOvers = document.getElementById('cTotalOvers');
-        DOMElements.cStatusTextCtrl = document.getElementById('cStatusTextCtrl');
-        DOMElements.startSecondInningsBtn = document.getElementById('startSecondInningsBtn');
-        DOMElements.cB1NameCtrl = document.getElementById('cB1NameCtrl');
-        DOMElements.cB2NameCtrl = document.getElementById('cB2NameCtrl');
-        DOMElements.cBoNameCtrl = document.getElementById('cBoNameCtrl');
-        DOMElements.cWicketCrossed = document.getElementById('cWicketCrossed');
-        DOMElements.cExtraRunsOffBall = document.getElementById('cExtraRunsOffBall');
-        DOMElements.cByeLegByeRuns = document.getElementById('cByeLegByeRuns');
-    }
-
-
-    function defaultPlayerState(name = "Player") {
-        return { name: name, runs: 0, balls: 0, fours: 0, sixes: 0, onStrike: false, partnershipRuns:0, partnershipBalls:0 };
-    }
-    function defaultBowlerState(name = "Bowler") {
-        return { name: name, oversCompleted: 0, ballsThisOver: 0, maidens: 0, runsConceded: 0, wickets: 0 };
-    }
-    function defaultTeamState(name = "Team", shortName = "TM") {
-         return { name: name, shortName: shortName.toUpperCase(), score: 0, wickets: 0, oversCompleted: 0, ballsThisOver: 0 };
-    }
-
-    function initMatchState() {
-        const homeTeamName = DOMElements.cHomeTeamName.value || "HOME TEAM";
-        const homeTeamShort = DOMElements.cHomeTeamShort.value.toUpperCase() || "HOM";
-        const awayTeamName = DOMElements.cAwayTeamName.value || "AWAY TEAM";
-        const awayTeamShort = DOMElements.cAwayTeamShort.value.toUpperCase() || "AWY";
-
-        matchState = {
-            homeTeam: defaultTeamState(homeTeamName, homeTeamShort), // Batting first by default
-            awayTeam: defaultTeamState(awayTeamName, awayTeamShort),
-            battingTeamKey: 'homeTeam', // 'homeTeam' or 'awayTeam'
-            bowlingTeamKey: 'awayTeam',
-            totalOvers: parseInt(DOMElements.cTotalOvers.value) || 20,
-            currentInning: 1,
-            batsmen: [
-                { ...defaultPlayerState(DOMElements.cB1NameCtrl.value || "Batsman 1"), id:'b1', onStrike: true },
-                { ...defaultPlayerState(DOMElements.cB2NameCtrl.value || "Batsman 2"), id:'b2', onStrike: false }
-            ],
-            currentBowler: defaultBowlerState(DOMElements.cBoNameCtrl.value || "Bowler 1"),
-            partnership: { runs: 0, balls: 0, b1Name: "", b2Name: "" },
-            target: 0,
-            timeline: [],
-            fow: [],
-            status: "Match Ready to Start",
-            gameOver: false,
-            runsThisOverForMaiden: 0, // For bowler's maiden calculation
-            ballsInOver: 6 // Default, can be changed in future
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+          apiKey: "AIzaSyDe_8FQU1oGckSQfyCr58ozTecHXke5noo",
+          authDomain: "my-cricket-scoreboard-84f5e.firebaseapp.com",
+          projectId: "my-cricket-scoreboard-84f5e",
+          storageBucket: "my-cricket-scoreboard-84f5e.firebasestorage.app",
+          messagingSenderId: "191346727068",
+          appId: "1:191346727068:web:44b8809fce69640ea77559",
+          measurementId: "G-4H90LYB1B4" // We don't strictly need this for Realtime DB, but it's harmless to keep
         };
-        deliveryHistory = [];
-        DOMElements.startSecondInningsBtn.style.display = 'none';
-    }
 
-    function getBattingTeam() { return matchState[matchState.battingTeamKey]; }
-    function getBowlingTeam() { return matchState[matchState.bowlingTeamKey]; }
-    function getStriker() { return matchState.batsmen.find(b => b.onStrike); }
-    function getNonStriker() { return matchState.batsmen.find(b => !b.onStrike); }
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
 
-    function setupNewMatch() {
-        if (!confirm("This will reset the current match and all its data. Are you sure?")) return;
-        initMatchState();
-        updateControllerInputsFromState(); // Populate controller fields from new state
-        matchState.status = `${getBattingTeam().name} to bat.`;
-        updateDisplay();
-        saveState();
-    }
-    
-    function swapEnds() { // Swaps batting/bowling teams during setup or if toss was wrong
-        const tempBattingKey = matchState.battingTeamKey;
-        matchState.battingTeamKey = matchState.bowlingTeamKey;
-        matchState.bowlingTeamKey = tempBattingKey;
-        matchState.status = `${getBattingTeam().name} to bat.`;
+        let matchState = {};
+        let deliveryHistory = [];
 
-        // Also swap the input fields in the controller
-        const tempHomeName = DOMElements.cHomeTeamName.value;
-        const tempHomeShort = DOMElements.cHomeTeamShort.value;
-        DOMElements.cHomeTeamName.value = DOMElements.cAwayTeamName.value;
-        DOMElements.cHomeTeamShort.value = DOMElements.cAwayTeamShort.value;
-        DOMElements.cAwayTeamName.value = tempHomeName;
-        DOMElements.cAwayTeamShort.value = tempHomeShort;
-        
-        // Update team objects in matchState
-        matchState.homeTeam.name = DOMElements.cHomeTeamName.value;
-        matchState.homeTeam.shortName = DOMElements.cHomeTeamShort.value.toUpperCase();
-        matchState.awayTeam.name = DOMElements.cAwayTeamName.value;
-        matchState.awayTeam.shortName = DOMElements.cAwayTeamShort.value.toUpperCase();
+        const SCOREBOARD_DB_PATH = 'matchState_v3_modular';
 
-        alert(`Teams swapped. ${getBattingTeam().name} will now bat.`);
-        updateDisplay();
-        saveState();
-    }
-
-    function startSecondInnings() {
-        if (matchState.currentInning !== 1 || matchState.gameOver) {
-            alert("Cannot start second innings now."); return;
-        }
-        matchState.target = getBattingTeam().score + 1;
-        matchState.currentInning = 2;
-
-        const tempKey = matchState.battingTeamKey;
-        matchState.battingTeamKey = matchState.bowlingTeamKey;
-        matchState.bowlingTeamKey = tempKey;
-
-        let battingTeam = getBattingTeam();
-        battingTeam.score = 0; battingTeam.wickets = 0;
-        battingTeam.oversCompleted = 0; battingTeam.ballsThisOver = 0;
-
-        matchState.batsmen = [
-            { ...defaultPlayerState("New Batsman 1"), id:'b1', onStrike: true },
-            { ...defaultPlayerState("New Batsman 2"), id:'b2', onStrike: false }
-        ];
-        matchState.currentBowler = defaultBowlerState("New Bowler");
-        updatePlayerNamesCtrl(); // This will set controller inputs
-
-        matchState.partnership = { runs: 0, balls: 0, b1Name: matchState.batsmen[0].name, b2Name: matchState.batsmen[1].name };
-        matchState.timeline = [];
-        matchState.runsThisOverForMaiden = 0;
-        matchState.status = `${battingTeam.name} chasing ${matchState.target}`;
-        DOMElements.startSecondInningsBtn.style.display = 'none';
-        updateDisplay();
-        saveState();
-    }
-    
-    function updatePlayerNamesCtrl() {
-        // Update state from controller inputs
-        const striker = getStriker();
-        const nonStriker = getNonStriker();
-        if (striker.id === 'b1') {
-            striker.name = DOMElements.cB1NameCtrl.value;
-            nonStriker.name = DOMElements.cB2NameCtrl.value;
-        } else {
-            striker.name = DOMElements.cB2NameCtrl.value;
-            nonStriker.name = DOMElements.cB1NameCtrl.value;
-        }
-        matchState.currentBowler.name = DOMElements.cBoNameCtrl.value;
-        matchState.partnership.b1Name = getStriker().name; // Update partnership names
-        matchState.partnership.b2Name = getNonStriker().name;
-
-        // Update team names from controller
-        getBattingTeam().name = (matchState.battingTeamKey === 'homeTeam') ? DOMElements.cHomeTeamName.value : DOMElements.cAwayTeamName.value;
-        getBattingTeam().shortName = (matchState.battingTeamKey === 'homeTeam') ? DOMElements.cHomeTeamShort.value.toUpperCase() : DOMElements.cAwayTeamShort.value.toUpperCase();
-        getBowlingTeam().name = (matchState.bowlingTeamKey === 'homeTeam') ? DOMElements.cHomeTeamName.value : DOMElements.cAwayTeamName.value;
-        getBowlingTeam().shortName = (matchState.bowlingTeamKey === 'homeTeam') ? DOMElements.cHomeTeamShort.value.toUpperCase() : DOMElements.cAwayTeamShort.value.toUpperCase();
-        
-        matchState.status = DOMElements.cStatusTextCtrl.value || matchState.status;
-
-
-        updateDisplay();
-        saveState();
-    }
-
-    function updateControllerInputsFromState() {
-        DOMElements.cHomeTeamName.value = matchState.homeTeam.name;
-        DOMElements.cHomeTeamShort.value = matchState.homeTeam.shortName;
-        DOMElements.cAwayTeamName.value = matchState.awayTeam.name;
-        DOMElements.cAwayTeamShort.value = matchState.awayTeam.shortName;
-        DOMElements.cTotalOvers.value = matchState.totalOvers;
-        DOMElements.cStatusTextCtrl.value = matchState.status;
-
-        const striker = getStriker();
-        const nonStriker = getNonStriker();
-        DOMElements.cB1NameCtrl.value = striker.id === 'b1' ? striker.name : nonStriker.name;
-        DOMElements.cB2NameCtrl.value = striker.id === 'b2' ? striker.name : nonStriker.name;
-        DOMElements.cBoNameCtrl.value = matchState.currentBowler.name;
-    }
-
-
-    function logDelivery(event) {
-        if (matchState.gameOver) { alert("Match is over!"); return; }
-        
-        deliveryHistory.push(JSON.parse(JSON.stringify(matchState))); // Save for undo
-        if (deliveryHistory.length > 15) deliveryHistory.shift();
-
-        const battingTeam = getBattingTeam();
-        const striker = getStriker();
-        const nonStriker = getNonStriker(); // For partnership
-        const bowler = matchState.currentBowler;
-
-        let runsScored = event.runs || 0; // Runs scored by batsman or from the extra itself
-        let boundary = event.boundary || 0; // 4 or 6
-        let isLegalDelivery = true;
-        let ballEventString = "";
-        let runsOffExtraBall = parseInt(DOMElements.cExtraRunsOffBall.value) || 0;
-
-        if (event.extra) {
-            isLegalDelivery = false;
-            battingTeam.score++; // 1 run for the extra type (wd, nb)
-            bowler.runsConceded++;
-            matchState.runsThisOverForMaiden++;
-
-            if (event.extra === 'wd') {
-                battingTeam.score += runsOffExtraBall;
-                bowler.runsConceded += runsOffExtraBall;
-                matchState.runsThisOverForMaiden += runsOffExtraBall;
-                ballEventString = (1 + runsOffExtraBall) + "wd";
-            } else if (event.extra === 'nb') {
-                battingTeam.score += runsOffExtraBall;
-                bowler.runsConceded += runsOffExtraBall; // NB itself + runs off it count to bowler
-                striker.runs += runsOffExtraBall; // Runs hit off NB go to batsman
-                if (runsOffExtraBall > 0) striker.balls++; // NB ball faced if runs scored off bat
-                if (runsOffExtraBall === 4) striker.fours++;
-                if (runsOffExtraBall === 6) striker.sixes++;
-                matchState.runsThisOverForMaiden += runsOffExtraBall;
-                ballEventString = (1 + runsOffExtraBall) + "nb";
-            } else if (event.extra === 'b' || event.extra === 'lb') {
-                isLegalDelivery = true; // Byes/LegByes are legal
-                const byeRuns = parseInt(DOMElements.cByeLegByeRuns.value) || 0;
-                runsScored = byeRuns; // These runs are for the team, not batsman/bowler
-                battingTeam.score += runsScored;
-                striker.balls++; // Ball faced
-                matchState.runsThisOverForMaiden += runsScored;
-                ballEventString = runsScored + event.extra;
-            }
-            DOMElements.cExtraRunsOffBall.value = 0; // Reset extra runs input
-        } else { // Normal delivery
-            battingTeam.score += runsScored;
-            striker.runs += runsScored;
-            striker.balls++;
-            bowler.runsConceded += runsScored;
-            matchState.runsThisOverForMaiden += runsScored;
-            if (boundary === 4) striker.fours++;
-            if (boundary === 6) striker.sixes++;
-            ballEventString = runsScored.toString();
-            if (boundary === 4) ballEventString = "4";
-            if (boundary === 6) ballEventString = "6";
+        const DOMElements = {};
+        function cacheDOMElements() {
+            DOMElements.sbOverlayWrapper = document.getElementById('scoreboardOverlayWrapper');
+            DOMElements.sbHomeTeamLogo = document.getElementById('sbHomeTeamLogo');
+            DOMElements.sbHomeTeamName = document.getElementById('sbHomeTeamName');
+            DOMElements.sbAwayTeamLogo = document.getElementById('sbAwayTeamLogo');
+            DOMElements.sbAwayTeamName = document.getElementById('sbAwayTeamName');
+            DOMElements.sbStriker = document.getElementById('sbStriker');
+            DOMElements.sbB1Name = document.getElementById('sbB1Name');
+            DOMElements.sbB1Runs = document.getElementById('sbB1Runs');
+            DOMElements.sbB1Balls = document.getElementById('sbB1Balls');
+            DOMElements.sbNonStriker = document.getElementById('sbNonStriker');
+            DOMElements.sbB2Name = document.getElementById('sbB2Name');
+            DOMElements.sbB2Runs = document.getElementById('sbB2Runs');
+            DOMElements.sbB2Balls = document.getElementById('sbB2Balls');
+            DOMElements.sbCRR = document.getElementById('sbCRR');
+            DOMElements.sbScore = document.getElementById('sbScore');
+            DOMElements.sbOvers = document.getElementById('sbOvers');
+            DOMElements.sbRRR = document.getElementById('sbRRR');
+            DOMElements.sbTargetInfo = document.getElementById('sbTargetInfo');
+            DOMElements.sbTargetVal = document.getElementById('sbTargetVal');
+            DOMElements.sbRunsNeeded = document.getElementById('sbRunsNeeded');
+            DOMElements.sbBallsRemaining = document.getElementById('sbBallsRemaining');
+            DOMElements.sbBowlerName = document.getElementById('sbBowlerName');
+            DOMElements.sbBowlerFigures = document.getElementById('sbBowlerFigures');
+            DOMElements.sbTimeline = document.getElementById('sbTimeline');
+            DOMElements.sbStatusText = document.getElementById('sbStatusText');
+            DOMElements.sbPartnership = document.getElementById('sbPartnership');
+            DOMElements.sbPartnershipPanel = document.getElementById('sbPartnershipPanel');
+            DOMElements.infoPartnershipRuns = document.getElementById('infoPartnershipRuns');
+            DOMElements.infoPartnershipBalls = document.getElementById('infoPartnershipBalls');
+            DOMElements.infoP1PartnerName = document.getElementById('infoP1PartnerName');
+            DOMElements.infoP1PartnerRuns = document.getElementById('infoP1PartnerRuns');
+            DOMElements.infoP1PartnerBalls = document.getElementById('infoP1PartnerBalls');
+            DOMElements.infoP2PartnerName = document.getElementById('infoP2PartnerName');
+            DOMElements.infoP2PartnerRuns = document.getElementById('infoP2PartnerRuns');
+            DOMElements.infoP2PartnerBalls = document.getElementById('infoP2PartnerBalls');
+            DOMElements.scoreController = document.getElementById('scoreController');
+            DOMElements.cHomeTeamName = document.getElementById('cHomeTeamName');
+            DOMElements.cHomeTeamShort = document.getElementById('cHomeTeamShort');
+            DOMElements.cAwayTeamName = document.getElementById('cAwayTeamName');
+            DOMElements.cAwayTeamShort = document.getElementById('cAwayTeamShort');
+            DOMElements.cTotalOvers = document.getElementById('cTotalOvers');
+            DOMElements.cStatusTextCtrl = document.getElementById('cStatusTextCtrl');
+            DOMElements.startSecondInningsBtn = document.getElementById('startSecondInningsBtn');
+            DOMElements.cB1NameCtrl = document.getElementById('cB1NameCtrl');
+            DOMElements.cB2NameCtrl = document.getElementById('cB2NameCtrl');
+            DOMElements.cBoNameCtrl = document.getElementById('cBoNameCtrl');
+            DOMElements.cWicketCrossed = document.getElementById('cWicketCrossed');
+            DOMElements.cExtraRunsOffBall = document.getElementById('cExtraRunsOffBall');
+            DOMElements.cByeLegByeRuns = document.getElementById('cByeLegByeRuns');
         }
 
-        // Partnership
-        striker.partnershipRuns += (event.extra && (event.extra === 'b' || event.extra === 'lb')) ? 0 : (event.extra ? runsOffExtraBall : runsScored);
-        if(isLegalDelivery) {
-          striker.partnershipBalls++;
-          matchState.partnership.balls++;
-        }
-        matchState.partnership.runs = striker.partnershipRuns + nonStriker.partnershipRuns;
+        function defaultPlayerState(name = "Player") { return { name: name, runs: 0, balls: 0, fours: 0, sixes: 0, onStrike: false, partnershipRuns:0, partnershipBalls:0 }; }
+        function defaultBowlerState(name = "Bowler") { return { name: name, oversCompleted: 0, ballsThisOver: 0, maidens: 0, runsConceded: 0, wickets: 0 }; }
+        function defaultTeamState(name = "Team", shortName = "TM") { return { name: name, shortName: shortName.toUpperCase(), score: 0, wickets: 0, oversCompleted: 0, ballsThisOver: 0 }; }
 
-
-        // Wicket
-        if (event.wicket) {
-            battingTeam.wickets++;
-            bowler.wickets++;
-            ballEventString = "W";
-            // TODO: FOW details
-            // Reset current striker for new batsman
-            striker.name = "New Batsman"; striker.runs = 0; striker.balls = 0; striker.fours = 0; striker.sixes = 0;
-            striker.partnershipRuns = 0; striker.partnershipBalls = 0;
-            // Update controller input for new batsman name
-            DOMElements[(striker.id === 'b1' ? 'cB1NameCtrl' : 'cB2NameCtrl')].value = "New Batsman";
-            DOMElements[(striker.id === 'b1' ? 'cB1NameCtrl' : 'cB2NameCtrl')].focus();
-            
-            // Partnership reset, non-striker becomes the one who continues
-            matchState.partnership = { runs: nonStriker.partnershipRuns, balls: nonStriker.partnershipBalls, b1Name: striker.name, b2Name: nonStriker.name };
-        }
-        
-        matchState.timeline.unshift({ball: ballEventString, type: event.extra || (event.wicket ? 'W' : (boundary ? 'B' : 'R'))});
-        if (matchState.timeline.length > 12) matchState.timeline.pop();
-
-        // Ball counting and Over completion
-        if (isLegalDelivery) {
-            battingTeam.ballsThisOver++;
-            bowler.ballsThisOver++;
-
-            if (battingTeam.ballsThisOver >= matchState.ballsInOver) {
-                battingTeam.oversCompleted++;
-                battingTeam.ballsThisOver = 0;
-                bowler.oversCompleted++; // Actual overs for bowler
-                bowler.ballsThisOver = 0;
-
-                if (matchState.runsThisOverForMaiden === 0 && !event.extra) { // Maiden if no runs conceded from bat or extras that count against bowler
-                    bowler.maidens++;
-                }
-                matchState.runsThisOverForMaiden = 0;
-                
-                if (battingTeam.wickets < 10) swapStrike(); // End of over
-                // Prompt for new bowler in controller
-                DOMElements.cBoNameCtrl.value = "New Bowler";
-                DOMElements.cBoNameCtrl.focus();
-                matchState.currentBowler = defaultBowlerState("New Bowler"); // Reset for new bowler
-            }
+        function initMatchState() {
+            const homeTeamName = DOMElements.cHomeTeamName.value || "HOME TEAM";
+            const homeTeamShort = DOMElements.cHomeTeamShort.value.toUpperCase() || "HOM";
+            const awayTeamName = DOMElements.cAwayTeamName.value || "AWAY TEAM";
+            const awayTeamShort = DOMElements.cAwayTeamShort.value.toUpperCase() || "AWY";
+            matchState = {
+                homeTeam: defaultTeamState(homeTeamName, homeTeamShort),
+                awayTeam: defaultTeamState(awayTeamName, awayTeamShort),
+                battingTeamKey: 'homeTeam', bowlingTeamKey: 'awayTeam',
+                totalOvers: parseInt(DOMElements.cTotalOvers.value) || 20, currentInning: 1,
+                batsmen: [
+                    { ...defaultPlayerState(DOMElements.cB1NameCtrl.value || "Batsman 1"), id:'b1', onStrike: true },
+                    { ...defaultPlayerState(DOMElements.cB2NameCtrl.value || "Batsman 2"), id:'b2', onStrike: false }
+                ],
+                currentBowler: defaultBowlerState(DOMElements.cBoNameCtrl.value || "Bowler 1"),
+                partnership: { runs: 0, balls: 0, b1Name: (DOMElements.cB1NameCtrl.value || "Batsman 1"), b2Name: (DOMElements.cB2NameCtrl.value || "Batsman 2") },
+                target: 0, timeline: [], fow: [], status: "Match Ready to Start", gameOver: false,
+                runsThisOverForMaiden: 0, ballsInOver: 6
+            };
+            deliveryHistory = [];
+            if (DOMElements.startSecondInningsBtn) DOMElements.startSecondInningsBtn.style.display = 'none';
         }
 
-        // Strike Rotation on odd runs (legal delivery, not wicket)
-        if (isLegalDelivery && !event.wicket) {
-            let runsToCheckForStrike = 0;
-            if (event.extra === 'b' || event.extra === 'lb') {
-                runsToCheckForStrike = parseInt(DOMElements.cByeLegByeRuns.value) || 0;
-            } else if (!event.extra) { // Normal runs or runs off NB
-                runsToCheckForStrike = runsScored + (event.extra === 'nb' ? runsOffExtraBall : 0)
-            }
-            
-            if (runsToCheckForStrike % 2 !== 0) {
-                swapStrike();
-            }
-        }
-        
-        if (event.wicket && DOMElements.cWicketCrossed.checked) {
-            swapStrike();
-            DOMElements.cWicketCrossed.checked = false;
-        }
+        function getBattingTeam() { return matchState[matchState.battingTeamKey]; }
+        function getBowlingTeam() { return matchState[matchState.bowlingTeamKey]; }
+        function getStriker() { return matchState.batsmen.find(b => b.onStrike); }
+        function getNonStriker() { return matchState.batsmen.find(b => !b.onStrike); }
 
-        checkGameEnd();
-        updateDisplay();
-        saveState();
-    }
-    
-    function swapStrikeUI() { // Triggered by controller button
-        swapStrike();
-        updateDisplay();
-        saveState();
-    }
-
-    function swapStrike() {
-        const b1 = matchState.batsmen.find(b => b.id === 'b1');
-        const b2 = matchState.batsmen.find(b => b.id === 'b2');
-        b1.onStrike = !b1.onStrike;
-        b2.onStrike = !b2.onStrike;
-        // Update controller inputs to reflect new striker/non-striker
-        const striker = getStriker();
-        const nonStriker = getNonStriker();
-        DOMElements.cB1NameCtrl.value = striker.id === 'b1' ? striker.name : nonStriker.name;
-        DOMElements.cB2NameCtrl.value = striker.id === 'b2' ? striker.name : nonStriker.name;
-    }
-
-
-    function undoLastDelivery() {
-        if (deliveryHistory.length > 0) {
-            matchState = deliveryHistory.pop();
-            updateControllerInputsFromState(); // Sync controller UI with undone state
-            updateDisplay();
-            saveState();
-            alert("Last delivery undone.");
-        } else {
-            alert("No history to undo.");
-        }
-    }
-
-    function checkGameEnd() {
-        const battingTeam = getBattingTeam();
-        const isMaxOvers = battingTeam.oversCompleted >= matchState.totalOvers;
-        const isAllOut = battingTeam.wickets >= 10;
-
-        if (matchState.currentInning === 1) {
-            if (isAllOut || isMaxOvers) {
-                matchState.status = `Innings End: ${battingTeam.name} ${battingTeam.score}/${battingTeam.wickets}`;
-                DOMElements.startSecondInningsBtn.style.display = 'inline-block';
-            }
-        } else if (matchState.currentInning === 2) {
-            const runsNeeded = matchState.target - battingTeam.score;
-            if (runsNeeded <= 0 && !isAllOut) {
-                matchState.status = `${battingTeam.name} won by ${10 - battingTeam.wickets} wickets!`;
-                matchState.gameOver = true;
-            } else if (isAllOut || isMaxOvers) {
-                if (runsNeeded > 1) {
-                    matchState.status = `${getBowlingTeam().name} won by ${runsNeeded - 1} runs!`;
-                } else if (runsNeeded === 1) {
-                     matchState.status = "Match Tied!";
-                } else { // Should be caught by previous win condition
-                    matchState.status = `${battingTeam.name} won!`;
-                }
-                matchState.gameOver = true;
-            }
-        }
-    }
-    
-    function formatOversDisplay(overs, balls) { return `${overs}.${balls}`; }
-    function calculateSR(runs, balls) { return balls > 0 ? ((runs / balls) * 100).toFixed(1) : "0.0"; }
-    function calculateEcon(runs, oversCompleted, ballsThisOver) {
-        const totalBalls = (oversCompleted * matchState.ballsInOver) + ballsThisOver;
-        return totalBalls > 0 ? ((runs / totalBalls) * matchState.ballsInOver).toFixed(2) : "0.00";
-    }
-
-    function updateDisplay() {
-        if (!matchState || Object.keys(matchState).length === 0 || !DOMElements.sbScore) return;
-
-        const battingTeam = getBattingTeam();
-        const bowlingTeam = getBowlingTeam();
-        const striker = getStriker();
-        const nonStriker = getNonStriker();
-        const bowler = matchState.currentBowler;
-
-        // Teams
-        DOMElements.sbHomeTeamLogo.textContent = matchState.battingTeamKey === 'homeTeam' ? battingTeam.shortName : bowlingTeam.shortName;
-        DOMElements.sbHomeTeamName.textContent = matchState.battingTeamKey === 'homeTeam' ? battingTeam.name : bowlingTeam.name;
-        DOMElements.sbAwayTeamLogo.textContent = matchState.bowlingTeamKey === 'homeTeam' ? battingTeam.shortName : bowlingTeam.shortName;
-        DOMElements.sbAwayTeamName.textContent = matchState.bowlingTeamKey === 'homeTeam' ? battingTeam.name : bowlingTeam.name;
-        
-        // Batsmen
-        DOMElements.sbB1Name.textContent = striker.name;
-        DOMElements.sbB1Runs.textContent = striker.runs;
-        DOMElements.sbB1Balls.textContent = `(${striker.balls})`;
-        DOMElements.sbStriker.classList.add('striker');
-        DOMElements.sbNonStriker.classList.remove('striker');
-
-        DOMElements.sbB2Name.textContent = nonStriker.name;
-        DOMElements.sbB2Runs.textContent = nonStriker.runs;
-        DOMElements.sbB2Balls.textContent = `(${nonStriker.balls})`;
-        
-        // Score & Overs
-        DOMElements.sbScore.textContent = `${battingTeam.score}/${battingTeam.wickets}`;
-        DOMElements.sbOvers.textContent = formatOversDisplay(battingTeam.oversCompleted, battingTeam.ballsThisOver);
-
-        // CRR
-        const totalBallsBowledOverall = (battingTeam.oversCompleted * matchState.ballsInOver) + battingTeam.ballsThisOver;
-        DOMElements.sbCRR.textContent = `CRR: ${totalBallsBowledOverall > 0 ? ((battingTeam.score / totalBallsBowledOverall) * matchState.ballsInOver).toFixed(2) : "0.00"}`;
-
-        // Target & RRR (2nd Innings)
-        if (matchState.currentInning === 2 && matchState.target > 0) {
-            DOMElements.sbTargetInfo.style.display = 'block';
-            const runsNeeded = matchState.target - battingTeam.score;
-            const ballsRemaining = (matchState.totalOvers * matchState.ballsInOver) - totalBallsBowledOverall;
-            DOMElements.sbTargetVal.textContent = matchState.target;
-            DOMElements.sbRunsNeeded.textContent = runsNeeded > 0 ? runsNeeded : 0;
-            DOMElements.sbBallsRemaining.textContent = ballsRemaining > 0 ? ballsRemaining : 0;
-
-            if (runsNeeded <= 0 && battingTeam.wickets < 10) {
-                DOMElements.sbRRR.textContent = "WON";
-            } else if (ballsRemaining > 0 && runsNeeded > 0) {
-                DOMElements.sbRRR.textContent = `RRR: ${((runsNeeded / ballsRemaining) * matchState.ballsInOver).toFixed(2)}`;
-            } else if (runsNeeded > 0) {
-                DOMElements.sbRRR.textContent = "LOST";
-            } else {
-                 DOMElements.sbRRR.textContent = "---";
-            }
-        } else {
-            DOMElements.sbTargetInfo.style.display = 'none';
-            DOMElements.sbRRR.textContent = "RRR: N/A";
-        }
-
-        // Bowler
-        DOMElements.sbBowlerName.textContent = bowler.name;
-        DOMElements.sbBowlerFigures.textContent = `${bowler.oversCompleted}.${bowler.ballsThisOver}-${bowler.maidens}-${bowler.runsConceded}-${bowler.wickets} (${calculateEcon(bowler.runsConceded, bowler.oversCompleted, bowler.ballsThisOver)})`;
-        
-        // Timeline
-        DOMElements.sbTimeline.innerHTML = matchState.timeline.map(item => {
-            let ballClass = "ball";
-            if (item.type === 'W') ballClass += " ball-w";
-            else if (item.type === 'nb' || item.ball.includes('nb')) ballClass += " ball-nb";
-            else if (item.type === 'wd' || item.ball.includes('wd')) ballClass += " ball-wd";
-            else if (item.ball === '4') ballClass += " ball-4";
-            else if (item.ball === '6') ballClass += " ball-6";
-            return `<span class="${ballClass}">${item.ball}</span>`;
-        }).join(' ');
-
-        // Status & Partnership
-        DOMElements.sbStatusText.textContent = matchState.status;
-        DOMElements.sbPartnership.textContent = `${matchState.partnership.runs} (${matchState.partnership.balls}) - ${getStriker().name} & ${getNonStriker().name}`;
-        
-        // Update partnership panel if visible
-        if (DOMElements.sbPartnershipPanel.classList.contains('visible')) {
-            DOMElements.infoPartnershipRuns.textContent = matchState.partnership.runs;
-            DOMElements.infoPartnershipBalls.textContent = matchState.partnership.balls;
-            DOMElements.infoP1PartnerRuns.textContent = striker.partnershipRuns;
-            DOMElements.infoP1PartnerBalls.textContent = striker.partnershipBalls;
-            DOMElements.infoP2PartnerRuns.textContent = nonStriker.partnershipRuns;
-            DOMElements.infoP2PartnerBalls.textContent = nonStriker.partnershipBalls;
-        }
-    }
-
-    function saveState() {
-        localStorage.setItem(SCOREBOARD_LS_KEY, JSON.stringify(matchState));
-    }
-
-    function loadState() {
-        const saved = localStorage.getItem(SCOREBOARD_LS_KEY);
-        if (saved) {
-            matchState = JSON.parse(saved);
-            // Ensure functions are not stored in localStorage
-            if (typeof matchState.batsmen[0].defaultPlayerState === 'function') {
-                 // This indicates an old state structure, re-init or migrate carefully.
-                 // For now, let's re-initialize if structure is too old.
-                 console.warn("Old state structure detected, re-initializing.");
-                 setupNewMatch(); // Call setup which calls initMatchState
-                 return;
-            }
-             // Restore controller inputs from loaded state
+        window.setupNewMatch = function() {
+            if (!confirm("This will reset the current match and all its data in the cloud. Are you sure?")) return;
+            initMatchState();
             updateControllerInputsFromState();
-            if(matchState.currentInning === 1 && (getBattingTeam().wickets >= 10 || getBattingTeam().oversCompleted >= matchState.totalOvers)){
-                 DOMElements.startSecondInningsBtn.style.display = 'inline-block';
+            matchState.status = `${getBattingTeam().name} to bat.`;
+            saveState();
+        }
+        window.swapEnds = function() {
+            const tempBattingKey = matchState.battingTeamKey;
+            matchState.battingTeamKey = matchState.bowlingTeamKey;
+            matchState.bowlingTeamKey = tempBattingKey;
+            const tempHomeName = DOMElements.cHomeTeamName.value;
+            const tempHomeShort = DOMElements.cHomeTeamShort.value;
+            DOMElements.cHomeTeamName.value = DOMElements.cAwayTeamName.value;
+            DOMElements.cHomeTeamShort.value = DOMElements.cAwayTeamShort.value;
+            DOMElements.cAwayTeamName.value = tempHomeName;
+            DOMElements.cAwayTeamShort.value = tempHomeShort;
+            matchState.homeTeam.name = DOMElements.cHomeTeamName.value;
+            matchState.homeTeam.shortName = DOMElements.cHomeTeamShort.value.toUpperCase();
+            matchState.awayTeam.name = DOMElements.cAwayTeamName.value;
+            matchState.awayTeam.shortName = DOMElements.cAwayTeamShort.value.toUpperCase();
+            matchState.status = `${getBattingTeam().name} will now bat.`;
+            saveState();
+        }
+        window.startSecondInnings = function() {
+            if (matchState.currentInning !== 1 || matchState.gameOver) { alert("Cannot start second innings now."); return; }
+            matchState.target = getBattingTeam().score + 1;
+            matchState.currentInning = 2;
+            const tempKey = matchState.battingTeamKey;
+            matchState.battingTeamKey = matchState.bowlingTeamKey;
+            matchState.bowlingTeamKey = tempKey;
+            let battingTeam = getBattingTeam();
+            battingTeam.score = 0; battingTeam.wickets = 0; battingTeam.oversCompleted = 0; battingTeam.ballsThisOver = 0;
+            matchState.batsmen = [
+                { ...defaultPlayerState("New Batsman 1"), id:'b1', onStrike: true },
+                { ...defaultPlayerState("New Batsman 2"), id:'b2', onStrike: false }
+            ];
+            matchState.currentBowler = defaultBowlerState("New Bowler");
+            matchState.partnership = { runs: 0, balls: 0, b1Name: "New Batsman 1", b2Name: "New Batsman 2" };
+            matchState.timeline = []; matchState.runsThisOverForMaiden = 0;
+            matchState.status = `${battingTeam.name} chasing ${matchState.target}`;
+            DOMElements.startSecondInningsBtn.style.display = 'none';
+            updateControllerInputsFromState(); // Refresh controller with new player names
+            saveState();
+        }
+        window.updatePlayerNamesCtrl = function() {
+            const striker = getStriker(); const nonStriker = getNonStriker();
+            if (striker.id === 'b1') { striker.name = DOMElements.cB1NameCtrl.value; nonStriker.name = DOMElements.cB2NameCtrl.value; }
+            else { striker.name = DOMElements.cB2NameCtrl.value; nonStriker.name = DOMElements.cB1NameCtrl.value; }
+            matchState.currentBowler.name = DOMElements.cBoNameCtrl.value;
+            matchState.partnership.b1Name = getStriker().name; matchState.partnership.b2Name = getNonStriker().name;
+            getBattingTeam().name = (matchState.battingTeamKey === 'homeTeam') ? DOMElements.cHomeTeamName.value : DOMElements.cAwayTeamName.value;
+            getBattingTeam().shortName = (matchState.battingTeamKey === 'homeTeam') ? DOMElements.cHomeTeamShort.value.toUpperCase() : DOMElements.cAwayTeamShort.value.toUpperCase();
+            getBowlingTeam().name = (matchState.bowlingTeamKey === 'homeTeam') ? DOMElements.cHomeTeamName.value : DOMElements.cAwayTeamName.value;
+            getBowlingTeam().shortName = (matchState.bowlingTeamKey === 'homeTeam') ? DOMElements.cHomeTeamShort.value.toUpperCase() : DOMElements.cAwayTeamShort.value.toUpperCase();
+            matchState.status = DOMElements.cStatusTextCtrl.value || matchState.status || "Match in Progress";
+            saveState();
+        }
+        function updateControllerInputsFromState() {
+            if (!DOMElements.cHomeTeamName || !matchState.homeTeam) return;
+            DOMElements.cHomeTeamName.value = matchState.homeTeam.name;
+            DOMElements.cHomeTeamShort.value = matchState.homeTeam.shortName;
+            DOMElements.cAwayTeamName.value = matchState.awayTeam.name;
+            DOMElements.cAwayTeamShort.value = matchState.awayTeam.shortName;
+            DOMElements.cTotalOvers.value = matchState.totalOvers;
+            DOMElements.cStatusTextCtrl.value = matchState.status;
+            const striker = getStriker(); const nonStriker = getNonStriker();
+            if(striker && nonStriker){
+                 DOMElements.cB1NameCtrl.value = striker.id === 'b1' ? striker.name : nonStriker.name;
+                 DOMElements.cB2NameCtrl.value = striker.id === 'b2' ? striker.name : nonStriker.name;
+            } else if (matchState.batsmen && matchState.batsmen.length > 1) { // Fallback if onStrike not set yet
+                 DOMElements.cB1NameCtrl.value = matchState.batsmen[0].name;
+                 DOMElements.cB2NameCtrl.value = matchState.batsmen[1].name;
             }
-
-        } else {
-            setupNewMatch(); // This calls initMatchState and populates controller
+            if(matchState.currentBowler) DOMElements.cBoNameCtrl.value = matchState.currentBowler.name;
         }
-    }
-
-    function toggleInfoPanel(panelId) {
-        const panel = document.getElementById(panelId);
-        if (panel) {
-            panel.classList.toggle('visible');
-            if(panel.classList.contains('visible')) updateDisplay(); // Refresh data if opening
-        }
-    }
-
-    // --- Initial Setup & URL Handling ---
-    window.onload = () => {
-        cacheDOMElements(); // Cache all DOM elements once
-        loadState(); // Load any saved state first
-
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('view') === 'overlay') {
-            DOMElements.sbOverlayWrapper.classList.add('visible');
-            DOMElements.scoreController.style.display = 'none';
-        } else {
-            DOMElements.scoreController.classList.add('visible');
-            DOMElements.sbOverlayWrapper.classList.add('visible'); // Show overlay for preview
-        }
-        updateDisplay(); // Render based on loaded/initial state
-
-        // Listen for storage changes to update overlay if controlled from another tab
-        window.addEventListener('storage', (event) => {
-            if (event.key === SCOREBOARD_LS_KEY) {
-                console.log("Storage event detected by scoreboard, reloading state.");
-                loadState(); 
-                updateDisplay();
+        window.logDelivery = function(event) {
+            if (matchState.gameOver) { alert("Match is over!"); return; }
+            deliveryHistory.push(JSON.parse(JSON.stringify(matchState)));
+            if (deliveryHistory.length > 15) deliveryHistory.shift();
+            const battingTeam = getBattingTeam(); const striker = getStriker(); const nonStriker = getNonStriker(); const bowler = matchState.currentBowler;
+            let runsScored = event.runs || 0; let boundary = event.boundary || 0; let isLegalDelivery = true; let ballEventString = "";
+            let runsOffExtraBall = parseInt(DOMElements.cExtraRunsOffBall.value) || 0;
+            if (event.extra) {
+                isLegalDelivery = false; battingTeam.score++; bowler.runsConceded++; matchState.runsThisOverForMaiden++;
+                if (event.extra === 'wd') { battingTeam.score += runsOffExtraBall; bowler.runsConceded += runsOffExtraBall; matchState.runsThisOverForMaiden += runsOffExtraBall; ballEventString = (1 + runsOffExtraBall) + "wd"; }
+                else if (event.extra === 'nb') { battingTeam.score += runsOffExtraBall; bowler.runsConceded += runsOffExtraBall; striker.runs += runsOffExtraBall; if (runsOffExtraBall > 0) striker.balls++; if (runsOffExtraBall === 4) striker.fours++; if (runsOffExtraBall === 6) striker.sixes++; matchState.runsThisOverForMaiden += runsOffExtraBall; ballEventString = (1 + runsOffExtraBall) + "nb"; }
+                else if (event.extra === 'b' || event.extra === 'lb') { isLegalDelivery = true; const byeRuns = parseInt(DOMElements.cByeLegByeRuns.value) || 0; runsScored = byeRuns; battingTeam.score += runsScored; striker.balls++; matchState.runsThisOverForMaiden += runsScored; ballEventString = runsScored + event.extra; }
+                DOMElements.cExtraRunsOffBall.value = 0;
+            } else { battingTeam.score += runsScored; striker.runs += runsScored; striker.balls++; bowler.runsConceded += runsScored; matchState.runsThisOverForMaiden += runsScored; if (boundary === 4) striker.fours++; if (boundary === 6) striker.sixes++; ballEventString = runsScored.toString(); if (boundary === 4) ballEventString = "4"; if (boundary === 6) ballEventString = "6"; }
+            striker.partnershipRuns += (event.extra === 'b' || event.extra === 'lb') ? 0 : (event.extra ? runsOffExtraBall : runsScored);
+            if(isLegalDelivery) { striker.partnershipBalls++; matchState.partnership.balls++; }
+            matchState.partnership.runs = striker.partnershipRuns + nonStriker.partnershipRuns;
+            if (event.wicket) {
+                battingTeam.wickets++; bowler.wickets++; ballEventString = "W";
+                const outBatsmanId = striker.id;
+                striker.name = "New Batsman"; striker.runs = 0; striker.balls = 0; striker.fours = 0; striker.sixes = 0; striker.partnershipRuns = 0; striker.partnershipBalls = 0;
+                DOMElements[(outBatsmanId === 'b1' ? 'cB1NameCtrl' : 'cB2NameCtrl')].value = "New Batsman"; DOMElements[(outBatsmanId === 'b1' ? 'cB1NameCtrl' : 'cB2NameCtrl')].focus();
+                matchState.partnership = { runs: nonStriker.partnershipRuns, balls: nonStriker.partnershipBalls, b1Name: striker.name, b2Name: nonStriker.name };
             }
-        });
-    };
-    // --- SCRIPT END ---
+            matchState.timeline.unshift({ball: ballEventString, type: event.extra || (event.wicket ? 'W' : (boundary ? 'B' : 'R'))});
+            if (matchState.timeline.length > 12) matchState.timeline.pop();
+            if (isLegalDelivery) {
+                battingTeam.ballsThisOver++; bowler.ballsThisOver++;
+                if (battingTeam.ballsThisOver >= matchState.ballsInOver) {
+                    battingTeam.oversCompleted++; battingTeam.ballsThisOver = 0; bowler.oversCompleted++; bowler.ballsThisOver = 0;
+                    if (matchState.runsThisOverForMaiden === 0 && !event.extra) { bowler.maidens++; }
+                    matchState.runsThisOverForMaiden = 0; if (battingTeam.wickets < 10) swapStrike();
+                    DOMElements.cBoNameCtrl.value = "New Bowler"; DOMElements.cBoNameCtrl.focus(); matchState.currentBowler = defaultBowlerState("New Bowler");
+                }
+            }
+            if (isLegalDelivery && !event.wicket) {
+                let runsToCheckForStrike = 0;
+                if (event.extra === 'b' || event.extra === 'lb') { runsToCheckForStrike = parseInt(DOMElements.cByeLegByeRuns.value) || 0; }
+                else if (!event.extra) { runsToCheckForStrike = runsScored + (event.extra === 'nb' ? runsOffExtraBall : 0) }
+                if (runsToCheckForStrike % 2 !== 0) { swapStrike(); }
+            }
+            if (event.wicket && DOMElements.cWicketCrossed.checked) { swapStrike(); DOMElements.cWicketCrossed.checked = false; }
+            checkGameEnd(); saveState();
+        }
+        window.swapStrikeUI = function() { swapStrike(); saveState(); }
+        function swapStrike() {
+            const b1 = matchState.batsmen.find(b => b.id === 'b1'); const b2 = matchState.batsmen.find(b => b.id === 'b2');
+            b1.onStrike = !b1.onStrike; b2.onStrike = !b2.onStrike;
+            const striker = getStriker(); const nonStriker = getNonStriker();
+            DOMElements.cB1NameCtrl.value = striker.id === 'b1' ? striker.name : nonStriker.name;
+            DOMElements.cB2NameCtrl.value = striker.id === 'b2' ? striker.name : nonStriker.name;
+        }
+        window.undoLastDelivery = function() { if (deliveryHistory.length > 0) { matchState = deliveryHistory.pop(); saveState(); alert("Last delivery undone."); } else { alert("No local history to undo."); } }
+        function checkGameEnd() {
+            const battingTeam = getBattingTeam(); const isMaxOvers = battingTeam.oversCompleted >= matchState.totalOvers; const isAllOut = battingTeam.wickets >= 10;
+            if (matchState.currentInning === 1) { if (isAllOut || isMaxOvers) { matchState.status = `Innings End: ${battingTeam.name} ${battingTeam.score}/${battingTeam.wickets}`; DOMElements.startSecondInningsBtn.style.display = 'inline-block'; } }
+            else if (matchState.currentInning === 2) {
+                const runsNeeded = matchState.target - battingTeam.score;
+                if (runsNeeded <= 0 && !isAllOut) { matchState.status = `${battingTeam.name} won by ${10 - battingTeam.wickets} wickets!`; matchState.gameOver = true; }
+                else if (isAllOut || isMaxOvers) {
+                    if (runsNeeded > 1) { matchState.status = `${getBowlingTeam().name} won by ${runsNeeded - 1} runs!`; }
+                    else if (runsNeeded === 1) { matchState.status = "Match Tied!"; } else { matchState.status = `${battingTeam.name} won!`; }
+                    matchState.gameOver = true;
+                }
+            }
+        }
+        function formatOversDisplay(overs, balls) { return `${overs}.${balls}`; }
+        function calculateSR(runs, balls) { return balls > 0 ? ((runs / balls) * 100).toFixed(1) : "0.0"; }
+        function calculateEcon(runs, oversCompleted, ballsThisOver) { const totalBalls = (oversCompleted * matchState.ballsInOver) + ballsThisOver; return totalBalls > 0 ? ((runs / totalBalls) * matchState.ballsInOver).toFixed(2) : "0.00"; }
+        function updateDisplay() {
+            if (!matchState || Object.keys(matchState).length === 0 || !DOMElements.sbScore) return;
+            const battingTeam = getBattingTeam(); const bowlingTeam = getBowlingTeam(); const striker = getStriker(); const nonStriker = getNonStriker(); const bowler = matchState.currentBowler;
+            if (!battingTeam || !bowlingTeam || !striker || !nonStriker || !bowler) { console.warn("UpdateDisplay: Incomplete matchState."); return; }
+            DOMElements.sbHomeTeamLogo.textContent = (matchState.battingTeamKey === 'homeTeam' ? battingTeam.shortName : bowlingTeam.shortName) || "T1";
+            DOMElements.sbHomeTeamName.textContent = (matchState.battingTeamKey === 'homeTeam' ? battingTeam.name : bowlingTeam.name) || "Team 1";
+            DOMElements.sbAwayTeamLogo.textContent = (matchState.bowlingTeamKey === 'homeTeam' ? battingTeam.shortName : bowlingTeam.shortName) || "T2";
+            DOMElements.sbAwayTeamName.textContent = (matchState.bowlingTeamKey === 'homeTeam' ? battingTeam.name : bowlingTeam.name) || "Team 2";
+
+            DOMElements.sbB1Name.textContent = striker.name; DOMElements.sbB1Runs.textContent = striker.runs; DOMElements.sbB1Balls.textContent = `(${striker.balls})`;
+            DOMElements.sbStriker.classList.add('striker'); DOMElements.sbNonStriker.classList.remove('striker');
+            DOMElements.sbB2Name.textContent = nonStriker.name; DOMElements.sbB2Runs.textContent = nonStriker.runs; DOMElements.sbB2Balls.textContent = `(${nonStriker.balls})`;
+            DOMElements.sbScore.textContent = `${battingTeam.score}/${battingTeam.wickets}`; DOMElements.sbOvers.textContent = formatOversDisplay(battingTeam.oversCompleted, battingTeam.ballsThisOver);
+            const totalBallsBowledOverall = (battingTeam.oversCompleted * matchState.ballsInOver) + battingTeam.ballsThisOver;
+            DOMElements.sbCRR.textContent = `CRR: ${totalBallsBowledOverall > 0 ? ((battingTeam.score / totalBallsBowledOverall) * matchState.ballsInOver).toFixed(2) : "0.00"}`;
+            if (matchState.currentInning === 2 && matchState.target > 0) {
+                DOMElements.sbTargetInfo.style.display = 'block'; const runsNeeded = matchState.target - battingTeam.score; const ballsRemaining = (matchState.totalOvers * matchState.ballsInOver) - totalBallsBowledOverall;
+                DOMElements.sbTargetVal.textContent = matchState.target; DOMElements.sbRunsNeeded.textContent = runsNeeded > 0 ? runsNeeded : 0; DOMElements.sbBallsRemaining.textContent = ballsRemaining > 0 ? ballsRemaining : 0;
+                if (runsNeeded <= 0 && battingTeam.wickets < 10) { DOMElements.sbRRR.textContent = "WON"; }
+                else if (ballsRemaining > 0 && runsNeeded > 0) { DOMElements.sbRRR.textContent = `RRR: ${((runsNeeded / ballsRemaining) * matchState.ballsInOver).toFixed(2)}`;}
+                else if (runsNeeded > 0 && ballsRemaining <=0) { DOMElements.sbRRR.textContent = "LOST"; } else { DOMElements.sbRRR.textContent = "---"; }
+            } else { DOMElements.sbTargetInfo.style.display = 'none'; DOMElements.sbRRR.textContent = "RRR: N/A"; }
+            DOMElements.sbBowlerName.textContent = bowler.name;
+            DOMElements.sbBowlerFigures.textContent = `${bowler.oversCompleted}.${bowler.ballsThisOver}-${bowler.maidens}-${bowler.runsConceded}-${bowler.wickets} (${calculateEcon(bowler.runsConceded, bowler.oversCompleted, bowler.ballsThisOver)})`;
+            DOMElements.sbTimeline.innerHTML = matchState.timeline.map(item => { let c="ball"; if(item.type==='W')c+=" ball-w"; else if(item.ball.includes('nb'))c+=" ball-nb"; else if(item.ball.includes('wd'))c+=" ball-wd"; else if(item.ball==='4')c+=" ball-4"; else if(item.ball==='6')c+=" ball-6"; return `<span class="${c}">${item.ball}</span>`; }).join(' ');
+            DOMElements.sbStatusText.textContent = matchState.status;
+            DOMElements.sbPartnership.textContent = `${matchState.partnership.runs} (${matchState.partnership.balls}) - ${getStriker().name} & ${getNonStriker().name}`;
+            if (DOMElements.sbPartnershipPanel.classList.contains('visible')) {
+                DOMElements.infoPartnershipRuns.textContent = matchState.partnership.runs; DOMElements.infoPartnershipBalls.textContent = matchState.partnership.balls;
+                DOMElements.infoP1PartnerName.textContent = striker.name; DOMElements.infoP1PartnerRuns.textContent = striker.partnershipRuns; DOMElements.infoP1PartnerBalls.textContent = striker.partnershipBalls;
+                DOMElements.infoP2PartnerName.textContent = nonStriker.name; DOMElements.infoP2PartnerRuns.textContent = nonStriker.partnershipRuns; DOMElements.infoP2PartnerBalls.textContent = nonStriker.partnershipBalls;
+            }
+        }
+        function saveState() { set(ref(database, SCOREBOARD_DB_PATH), matchState).then(() => console.log("State saved to Firebase.")).catch(e => {console.error("Save Error:", e); alert("Error saving data.");}); }
+        function loadAndListenFirebase() {
+            onValue(ref(database, SCOREBOARD_DB_PATH), (snapshot) => {
+                const dataFromFirebase = snapshot.val();
+                if (dataFromFirebase) { matchState = dataFromFirebase; console.log("State loaded/updated from Firebase:", matchState); updateControllerInputsFromState(); updateDisplay(); }
+                else { console.log("No data in Firebase. Initialize locally."); if (Object.keys(matchState).length === 0) { initMatchState(); updateControllerInputsFromState(); updateDisplay(); } }
+            }, (error) => { console.error("Firebase read failed:", error.code); alert("Error connecting to cloud data."); });
+        }
+        window.toggleInfoPanel = function(panelId) { const p = document.getElementById(panelId); if(p){p.classList.toggle('visible'); if(p.classList.contains('visible') && Object.keys(matchState).length > 0) updateDisplay();} }
+        window.onload = () => {
+            cacheDOMElements(); loadAndListenFirebase();
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('view') === 'overlay') { DOMElements.sbOverlayWrapper.classList.add('visible'); if (DOMElements.scoreController) DOMElements.scoreController.style.display = 'none'; }
+            else { if (DOMElements.scoreController) DOMElements.scoreController.classList.add('visible'); if (DOMElements.sbOverlayWrapper) DOMElements.sbOverlayWrapper.classList.add('visible'); }
+        };
     </script>
 </body>
 </html>
